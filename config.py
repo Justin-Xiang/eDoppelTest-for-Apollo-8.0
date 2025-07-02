@@ -41,3 +41,15 @@ MAX_PD_COUNT = 2
 SCENARIO_UPPER_LIMIT = 30
 FORCE_INVALID_TRAFFIC_CONTROL = False
 RUN_FOR_HOUR = 6
+
+# APOLLO CONFIGURATION ==============================
+PERCEPTION_FREQUENCY = 25
+"""Rate at which the Message Broker publishes perception messages"""
+APOLLO_VEHICLE_LENGTH = 4.933
+"""Length of default Apollo vehicle"""
+APOLLO_VEHICLE_WIDTH = 2.11
+"""Width of default Apollo vehicle"""
+APOLLO_VEHICLE_HEIGHT = 1.48
+"""Height of default Apollo vehicle"""
+APOLLO_VEHICLE_back_edge_to_center = 1.043
+"""Length between the back edge and the center of default Apollo vehicle"""

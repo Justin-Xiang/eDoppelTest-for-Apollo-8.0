@@ -4,11 +4,11 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
-from math import atan2, pi
+from math import atan2, pi, sin, cos
 from typing import Dict, Iterable, List, Optional, Tuple
 
 import networkx as nx
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.base import BaseGeometry
 
 from .kdtree import KDTree, KDTreeParams
@@ -19,12 +19,51 @@ from .proto_v8.modules.common_msgs.map_msgs.map_overlap_pb2 import Overlap
 from .proto_v8.modules.common_msgs.map_msgs.map_pb2 import Map
 from .proto_v8.modules.common_msgs.map_msgs.map_signal_pb2 import Signal
 from .proto_v8.modules.common_msgs.map_msgs.map_stop_sign_pb2 import StopSign
+from .proto_v8.modules.common_msgs.basic_msgs.geometry_pb2 import Point3D
+
+from hdmap.MapParser import MapParser
+from config import APOLLO_VEHICLE_LENGTH, APOLLO_VEHICLE_WIDTH, APOLLO_VEHICLE_back_edge_to_center, HD_MAP
 
 
 @dataclass
 class SegmentInfo:
     lane_id: str
     segment_index: int
+
+
+def generate_adc_polygon(position: Point3D, theta: float) -> List[Point3D]:
+    """
+    Generate a polygon for the ADC based on its current position
+
+    :param Point3D position: position of the ADC
+    :param float theta: the heading of the ADC (in radians)
+
+    :returns: a list consisting 4 Point3D objects to 
+        represent ADC polygon
+    :rtype: List[Point3D]
+    """
+
+    points = []
+    half_w = APOLLO_VEHICLE_WIDTH / 2.0
+    front_l = APOLLO_VEHICLE_LENGTH - APOLLO_VEHICLE_back_edge_to_center
+    back_l = -1 * APOLLO_VEHICLE_back_edge_to_center
+    sin_h = sin(theta)
+    cos_h = cos(theta)
+    vectors = [(front_l * cos_h - half_w * sin_h,
+                front_l * sin_h + half_w * cos_h),
+               (back_l * cos_h - half_w * sin_h,
+                back_l * sin_h + half_w * cos_h),
+               (back_l * cos_h + half_w * sin_h,
+                back_l * sin_h - half_w * cos_h),
+               (front_l * cos_h + half_w * sin_h,
+                front_l * sin_h - half_w * cos_h)]
+    for x, y in vectors:
+        p = Point3D()
+        p.x = position.x + x
+        p.y = position.y + y
+        p.z = position.z
+        points.append(p)
+    return points
 
 
 @dataclass
@@ -38,10 +77,27 @@ class PositionEstimate:
     def to_json(self):
         return {"lane_id": self.lane_id, "s": self.s}
     
-    def is_too_close(self, other: "PositionEstimate", threshold = 5.0) -> bool:
-        if self.lane_id != other.lane_id:
-            return False
-        return abs(self.s - other.s) < threshold
+    def is_too_close(self, rhs) -> bool:
+        """
+        Check if 2 PositionEstimate objects are too close to each other. 
+        They are too close if their distance is less than 5 meters.
+        
+        :param self rhs: right hand side object for comparison
+        :returns:
+            True if too close, False otherwise
+        :rtype: bool
+        """
+        # 2 vehicles are too close if their distance is less than 5 meters
+        ma = MapParser.get_instance(HD_MAP)
+        adc1 = generate_adc_polygon(
+            *ma.get_coordinate_and_heading(self.lane_id, self.s))
+        adc2 = generate_adc_polygon(
+            *ma.get_coordinate_and_heading(rhs.lane_id, rhs.s))
+
+        adc1p = Polygon([[x.x, x.y] for x in adc1])
+        adc2p = Polygon([[x.x, x.y] for x in adc2])
+
+        return adc1p.distance(adc2p) < 5
 
 
 def is_allowed_to_cross(boundary: LaneBoundary):
