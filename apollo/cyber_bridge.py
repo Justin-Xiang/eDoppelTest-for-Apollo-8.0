@@ -82,10 +82,12 @@ class Channels:
         TrafficLightDetection,
     )
     """Traffic Light Channel"""
-    Planning = Channel(
+    Planning = Channel("/apollo/planning", "apollo.planning.ADCTrajectory", ADCTrajectory)
+    """Planning Channel"""
+    PlanningSimplified = Channel(
         "/apollo/planning/simplified", "apollo.planning.ADCTrajectory", ADCTrajectory
     )
-    """Planning Channel"""
+    """Planning Simplified Channel"""
     RoutingRequest = Channel(
         "/apollo/routing_request", "apollo.routing.RoutingRequest", RoutingRequest
     )

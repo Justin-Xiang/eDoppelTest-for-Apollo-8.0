@@ -5,7 +5,7 @@ from typing import List, Optional, Set, Tuple
 from loguru import logger
 from apollo.map_service import PositionEstimate
 from apollo.proto_v8.modules.common_msgs.planning_msgs.planning_pb2 import ADCTrajectory
-from apollo.utils import extract_main_decision
+from apollo.utils import extract_decision
 from config import HD_MAP
 
 from utils import get_map_service_for_map
@@ -80,11 +80,22 @@ class ApolloRunner:
             Callback function when planning message is received
             """
             self.planning = data
-            decisions = extract_main_decision(data)
-            self.__decisions.update(decisions)
+            decision_summary = extract_decision(data)
+            if not decision_summary:
+                return
+
+            if decision_summary.main_decision:
+                self.__decisions.add(("main", decision_summary.main_decision))
+
+            if decision_summary.object_decision:
+                for obj_id, obj_decisions in decision_summary.object_decision.items():
+                    for d in obj_decisions:
+                        self.__decisions.add(("object", str(obj_id), d))
 
         self.container.bridge.add_subscriber(Channels.Localization, lcb)
+        # Subscribe to both planning topics for Apollo version compatibility.
         self.container.bridge.add_subscriber(Channels.Planning, pcb)
+        self.container.bridge.add_subscriber(Channels.PlanningSimplified, pcb)
 
 
     def initialize(self):
