@@ -16,6 +16,7 @@ from config import APOLLO_ROOT, SCENARIO_UPPER_LIMIT
 from eDoppelTest.representation import Scenario
 from eDoppelTest.representation.ad_agents import ADAgent
 from eDoppelTest.representation.PedestrianManager import PedestrianManager
+from eDoppelTest.representation.pd_agents import PDAgent
 from eDoppelTest.representation.TrafficControlManager import TrafficControlManager
 from utils import random_numeric_id
 
@@ -97,6 +98,9 @@ class ScenarioRunner:
         clean_appolo_dir(APOLLO_ROOT)
 
         # initialize pedestrian and traffic control manager
+        if len(self.curr_scenario.pd_section.pds) == 0:
+            # Ensure each scenario has at least one pedestrian obstacle.
+            self.curr_scenario.pd_section.add_agent(PDAgent.get_one())
         self.pm = PedestrianManager(self.curr_scenario.pd_section)
         self.tm = TrafficControlManager(self.curr_scenario.tc_section)
         self.is_initialized = True
@@ -133,6 +137,10 @@ class ScenarioRunner:
             # Publish TrafficLight
             tld = self.tm.get_traffic_configuration(runner_time / 1000)
             mbk.broadcast(Channels.TrafficLight, tld.SerializeToString())
+
+            # Publish pedestrian obstacles together with vehicle obstacles.
+            peds = self.pm.get_pedestrians(runner_time / 1000)
+            mbk.set_extra_obstacles(peds)
 
             # Send Routing
             for ar in self.__runners:

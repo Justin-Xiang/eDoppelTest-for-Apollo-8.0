@@ -21,7 +21,6 @@ from .proto_v8.modules.common_msgs.map_msgs.map_signal_pb2 import Signal
 from .proto_v8.modules.common_msgs.map_msgs.map_stop_sign_pb2 import StopSign
 from .proto_v8.modules.common_msgs.basic_msgs.geometry_pb2 import Point3D
 
-from hdmap.MapParser import MapParser
 from config import APOLLO_VEHICLE_LENGTH, APOLLO_VEHICLE_WIDTH, APOLLO_VEHICLE_back_edge_to_center, HD_MAP
 
 
@@ -87,12 +86,19 @@ class PositionEstimate:
             True if too close, False otherwise
         :rtype: bool
         """
-        # 2 vehicles are too close if their distance is less than 5 meters
-        ma = MapParser.get_instance(HD_MAP)
-        adc1 = generate_adc_polygon(
-            *ma.get_coordinate_and_heading(self.lane_id, self.s))
-        adc2 = generate_adc_polygon(
-            *ma.get_coordinate_and_heading(rhs.lane_id, rhs.s))
+        # 2 vehicles are too close if their distance is less than 5 meters.
+        # Use the in-repo MapService to avoid external map parser/pickle issues.
+        from utils import get_map_service_for_map
+
+        map_service = get_map_service_for_map(HD_MAP)
+        p1, h1 = map_service.get_lane_coord_and_heading(self.lane_id, self.s)
+        p2, h2 = map_service.get_lane_coord_and_heading(rhs.lane_id, rhs.s)
+
+        pos1 = Point3D(x=p1.x, y=p1.y, z=0.0)
+        pos2 = Point3D(x=p2.x, y=p2.y, z=0.0)
+
+        adc1 = generate_adc_polygon(pos1, h1)
+        adc2 = generate_adc_polygon(pos2, h2)
 
         adc1p = Polygon([[x.x, x.y] for x in adc1])
         adc2p = Polygon([[x.x, x.y] for x in adc2])

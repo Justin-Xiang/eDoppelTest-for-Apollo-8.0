@@ -9,6 +9,7 @@ from .proto_v8.modules.common_msgs.localization_msgs.localization_pb2 import (
     LocalizationEstimate,
 )
 from .proto_v8.modules.common_msgs.perception_msgs.perception_obstacle_pb2 import (
+    PerceptionObstacle,
     PerceptionObstacles,
 )
 from .utils import localization_to_obstacle
@@ -28,6 +29,14 @@ class MessageBroker:
         self.forward_frequency: int = forward_frequency
         self.spinning: bool = False
         self._thread: Optional[Thread] = None
+        self._extra_obstacles: List[PerceptionObstacle] = []
+
+    def set_extra_obstacles(self, obstacles: List[PerceptionObstacle]) -> None:
+        """
+        Set externally managed obstacles (e.g., pedestrians) to be included
+        in each perception publish cycle.
+        """
+        self._extra_obstacles = list(obstacles)
 
     def broadcast(self, channel: Channel, data: bytes):
         """
@@ -61,6 +70,7 @@ class MessageBroker:
             # publish obstacle to all running instances
             for runner in self.runners:
                 perception_obs = [obs[x] for x in obs if x != runner.nid]
+                perception_obs.extend(self._extra_obstacles)
                 header = Header(
                     timestamp_sec=time.time(),
                     module_name="eDoppelTest",

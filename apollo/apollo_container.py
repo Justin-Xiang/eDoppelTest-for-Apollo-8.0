@@ -71,7 +71,22 @@ class ApolloContainer:
         """
         assert self.is_running(), f"Container {self.container_name} is not running."
         ctn = docker.from_env().containers.get(self.container_name)
-        return ctn.attrs["NetworkSettings"]["IPAddress"]
+        network_settings = ctn.attrs.get("NetworkSettings", {})
+
+        # Older Docker inspect payloads expose a top-level IPAddress.
+        ip_address = network_settings.get("IPAddress")
+        if ip_address:
+            return ip_address
+
+        # Newer payloads usually keep per-network addresses under Networks.
+        for network_info in network_settings.get("Networks", {}).values():
+            ip_address = network_info.get("IPAddress")
+            if ip_address:
+                return ip_address
+
+        raise RuntimeError(
+            f"Could not determine IP address for container {self.container_name}"
+        )
 
     def exists(self) -> bool:
         """
